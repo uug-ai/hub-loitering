@@ -1,0 +1,80 @@
+# hub-loitering — Custom workflow stage worker (marker example)
+
+## Overview
+
+**hub-loitering** is a standalone, queue-driven workflow stage worker in the UUG
+AI Hub platform. It is the clone-and-build companion to the *custom workflow
+stage* tutorial and the sibling of `hub-anpr`: where `hub-anpr` emits a
+**detection** block, `hub-loitering` emits a **marker** block, demonstrating the
+*non-redundant* half of the block contract — a stage that adds a new kind of
+result (a timeline span) instead of re-deriving what the classifier already
+produced.
+
+The `hub-workflows` engine dispatches a `loitering` stage to this worker
+whenever the stage registry routes a run to it — typically once an upstream
+`classify` stage has labelled a person. The worker measures how long a tracked
+subject lingers in the run's classify trajectory and routes a `marker` result
+back to the workflows engine, which persists it to the markers collection and
+may fan out further conditional stages that depend on `loitering`.
+
+It ships as its own repository (`github.com/uug-ai/hub-loitering`) — a
+**self-contained Go module** with its own `go.mod`, so it builds, tests, and
+ships as an independent service, mirroring the platform's other single-purpose
+workers (`hub-pipeline-export`, `hub-pipeline-redaction`, `hub-pipeline-thumbnail`).
+
+The worker is intentionally **DB-free**: all persistence is delegated to the
+workflows engine via the `loitering` operation result published on the workflows
+queue.
+
+---
+
+## Core Capabilities
+
+### Stage Consumption
+- Consume `models.WorkflowRun` dispatches from `kcloud-loitering-queue.fifo`
+  (overridable via `LOITERING_QUEUE`)
+- Reconnect automatically on RabbitMQ disconnects
+- Forward unparseable messages to `dead-letter-queue`
+
+### Stage Processing
+- Run the stage logic in `internal/loitering` (`loitering.Process`) — measure the
+  longest dwell in the run's `classify` trajectory and compile a timeline marker,
+  so the routing can be proven end-to-end before real behaviour analysis is added
+- Derive the marker's start/end from the recording start encoded in the run key
+  and the analysed-frame span (no media fetch needed for the demo)
+- Never log or echo back the storage credentials carried on the dispatch; only
+  note their presence (`loitering.HasCredentials`)
+
+### Result Routing
+- Wrap the marker in a single-block `ingest.BlockEnvelope` (`KindMarker`) as the
+  run Payload and publish it back onto the workflows queue (`WORKFLOWS_QUEUE`,
+  default `kcloud-workflows-queue`)
+- Return `PipelineCancel` since the result is routed onward via an explicit
+  publish
+
+### Observability
+- Expose a Prometheus `_processed_total` counter on `:8080/metrics`
+- JSON structured logging honouring `LOG_LEVEL`
+
+---
+
+## Layout
+
+```
+main.go                  Command wiring: logger, env, queue, metrics, read loop
+handleMessage.go         Transport glue: dispatch -> internal/loitering -> route result
+internal/loitering/      Stage behaviour (Process, HasCredentials, Operation)
+```
+
+## Routing
+
+Which runs reach this stage lives entirely in the engine's
+`PIPELINE_STAGE_REGISTRY` as the stage's `operation`, `dispatch`, `queue`,
+`needs`, and `condition`. This worker only performs the stage's side effect; it
+does not decide its own routing.
+
+## Configuration
+
+See `.env.example` for the broker and queue settings. In a Hub deployment these
+are injected by the Helm chart (`charts/hub` → `hub-stage.yaml`); locally they
+are provided via `.env.local`.
