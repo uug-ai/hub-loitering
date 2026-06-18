@@ -48,7 +48,7 @@ queue.
 ### Result Routing
 - Wrap the marker in a single-block `ingest.BlockEnvelope` (`KindMarker`) as the
   run Payload and publish it back onto the workflows queue (`WORKFLOWS_QUEUE`,
-  default `kcloud-workflows-queue`)
+  default `hub-workflows-queue`)
 - Return `PipelineCancel` since the result is routed onward via an explicit
   publish
 

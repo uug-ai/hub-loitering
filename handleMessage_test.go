@@ -47,7 +47,7 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 		},
 	}
 
-	action := handleMessage(logrus.New(), q, "kcloud-workflows-queue", run)
+	action := handleMessage(logrus.New(), q, "hub-workflows-queue", run)
 	if action != models.PipelineCancel {
 		t.Errorf("action = %q, want %q (result routed explicitly)", action, models.PipelineCancel)
 	}

@@ -36,7 +36,6 @@ import (
 
 var (
 	serviceName     = "hub-loitering"
-	routerQueue     = "kcloud-event-queue"
 	deadLetterQueue = "dead-letter-queue"
 )
 
@@ -76,15 +75,15 @@ func main() {
 	// engine publishes to "kcloud-<operation>-queue.fifo", so the default
 	// matches the engine's queueNameFor("loitering"). Override with
 	// LOITERING_QUEUE if the dispatch naming convention changes.
-	consumerQueue := envOr("LOITERING_QUEUE", "kcloud-"+loitering.Operation+"-queue.fifo")
+	stageQueue := envOr("LOITERING_QUEUE", "kcloud-"+loitering.Operation+"-queue.fifo")
 
 	// The workflows engine queue this worker routes its result back to, so the
 	// run records the "loitering" resolution and can dispatch any conditional
 	// stage that needs it. Defaults to the engine's consumer queue.
-	workflowsQueue := envOr("WORKFLOWS_QUEUE", "kcloud-workflows-queue")
+	workflowsQueue := envOr("WORKFLOWS_QUEUE", "hub-workflows-queue")
 
 	// Prometheus metrics, exposed on :8080/metrics like the other workers.
-	metricName := strings.NewReplacer("-", "_", ".", "_").Replace(consumerQueue)
+	metricName := strings.NewReplacer("-", "_", ".", "_").Replace(stageQueue)
 	processed := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricName + "_processed_total",
 		Help: "Total number of loitering stage messages processed.",
@@ -97,17 +96,15 @@ func main() {
 		}
 	}()
 
-	// Connect to RabbitMQ. RouterQueue/AnalysisQueue are unused by this worker
-	// (it never forwards down a stage list), but the queue library requires the
-	// full set; the deadletter queue catches unparseable messages.
+	// Connect to RabbitMQ. This worker only consumes and dead-letters; it never
+	// forwards down a stage list, so RouterQueue/AnalysisQueue are left unset.
+	// The deadletter queue catches unparseable messages.
 	options := queue.NewRabbitOptions().
 		SetHost(os.Getenv("RABBITMQ_HOST")).
 		SetExchange(os.Getenv("RABBITMQ_EXCHANGE")).
 		SetUsername(os.Getenv("RABBITMQ_USERNAME")).
 		SetPassword(os.Getenv("RABBITMQ_PASSWORD")).
-		SetConsumerQueue(consumerQueue).
-		SetRouterQueue(routerQueue).
-		SetAnalysisQueue(consumerQueue).
+		SetWorkflowsStageQueue(stageQueue).
 		SetDeadletterQueue(deadLetterQueue).
 		Build()
 
@@ -119,7 +116,7 @@ func main() {
 		logger.Fatalf("failed to connect to queue: %v", err)
 	}
 
-	logger.Infof("%s started: consuming %q, routing results to %q", serviceName, consumerQueue, workflowsQueue)
+	logger.Infof("%s started: consuming %q, routing results to %q", serviceName, stageQueue, workflowsQueue)
 
 	prometheusHandler := func(models.PipelineMetrics) { processed.Inc() }
 

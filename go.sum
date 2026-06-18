@@ -49,8 +49,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/uug-ai/models v1.6.3 h1:LQXs9FxFdchf4tKF3BiQHxfC5N2qO3Cm5IzcTeoDObs=
 github.com/uug-ai/models v1.6.3/go.mod h1:3i38Q6uAnVe3YQMoC317IH9y+nJY7H1fYo5pF6nPjmM=
-github.com/uug-ai/queue v1.3.6 h1:GTlmHFAMiE11t7Mpgf5xLv2WZdVwk6cZMDwuUqaZ3/0=
-github.com/uug-ai/queue v1.3.6/go.mod h1:LJu0duX2+G7lY40SAtTNc4qnrV+HemAZvksGBdK8dDo=
+github.com/uug-ai/queue v1.3.8 h1:T2uloDLQnAMvxvKJYhv9PlBoimUZAhlLYArADHPaLLg=
+github.com/uug-ai/queue v1.3.8/go.mod h1:LJu0duX2+G7lY40SAtTNc4qnrV+HemAZvksGBdK8dDo=
 go.mongodb.org/mongo-driver v1.17.9 h1:IexDdCuuNJ3BHrELgBlyaH9p60JXAvdzWR128q+U5tU=
 go.mongodb.org/mongo-driver v1.17.9/go.mod h1:LlOhpH5NUEfhxcAwG0UEkMqwYcc4JU18gtCdGudk/tQ=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

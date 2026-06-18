@@ -6,7 +6,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/uug-ai/models v1.6.3
-	github.com/uug-ai/queue v1.3.6
+	github.com/uug-ai/queue v1.3.8
 )
 
 require (

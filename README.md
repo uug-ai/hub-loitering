@@ -28,7 +28,7 @@ classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶
                                                                           │
                                                   measures longest dwell  │
                                                   builds a marker block    ▼
-   engine ◀─ route result ◀─ kcloud-workflows-queue ◀── { blocks: [ marker ] }
+   engine ◀─ route result ◀─ hub-workflows-queue ◀── { blocks: [ marker ] }
      │
      └─▶ markers collection  +  run.Results["loitering"]  (fans out conditional stages)
 ```
@@ -46,22 +46,27 @@ has labelled a person:
 [
   {
     "operation": "loitering",
-    "dispatch": "queue",
+    "dispatch": "conditional",
     "queue": "kcloud-loitering-queue.fifo",
     "needs": [
       { "operation": "classify",
-        "condition": { "path": "properties", "op": "contains", "value": "person" } }
+        "condition": { "path": "inputs.classify.properties", "op": "contains", "value": "person" } }
     ]
   }
 ]
 ```
+
+`dispatch` is the closed enum `always` | `conditional` (a stage with `needs`
+must be `conditional`), and a condition `path` is absolute from the run root —
+`inputs.classify.properties`, not a bare `properties`. The engine validates both
+at boot and refuses to start on an invalid registry.
 
 ## Configuration
 
 | Env var             | Default                       | Description                                                        |
 | ------------------- | ----------------------------- | ------------------------------------------------------------------ |
 | `LOITERING_QUEUE`   | `kcloud-loitering-queue.fifo` | Queue this worker consumes (must match the engine's dispatch name) |
-| `WORKFLOWS_QUEUE`   | `kcloud-workflows-queue`      | Queue the worker routes its result back to                         |
+| `WORKFLOWS_QUEUE`   | `hub-workflows-queue`         | Queue the worker routes its result back to                         |
 | `LOG_LEVEL`         | `info`                        | `trace` \| `debug` \| `info` \| `warn` \| `error`                  |
 | `RABBITMQ_HOST`     | —                             | RabbitMQ host                                                      |
 | `RABBITMQ_EXCHANGE` | —                             | RabbitMQ exchange                                                  |
