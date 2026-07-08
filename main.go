@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/uug-ai/models/pkg/models"
 	queue "github.com/uug-ai/queue/pkg/queue"
+	"github.com/uug-ai/trace/pkg/opentelemetry"
 
 	"github.com/uug-ai/hub-loitering/internal/loitering"
 )
@@ -82,6 +84,19 @@ func main() {
 	// stage that needs it. Defaults to the engine's consumer queue.
 	workflowsQueue := envOr("WORKFLOWS_QUEUE", "hub-workflows-queue")
 
+	// Start OpenTelemetry tracing so this stage's work joins the distributed trace
+	// the workflows engine propagates on each run (via run.TraceId). Tracing is
+	// best-effort: with no OTEL_EXPORTER_OTLP_ENDPOINT the tracer stays in no-op
+	// mode (trace v1.2.0) rather than failing the worker.
+	tracer, err := opentelemetry.NewTracer(serviceName)
+	if err != nil {
+		logger.Errorf("failed to create tracer: %v", err)
+	} else if err := tracer.Connect(); err != nil {
+		logger.Errorf("failed to connect tracer: %v", err)
+	} else {
+		defer func() { _ = tracer.Shutdown(context.Background()) }()
+	}
+
 	// Prometheus metrics, exposed on :8080/metrics like the other workers.
 	metricName := strings.NewReplacer("-", "_", ".", "_").Replace(stageQueue)
 	processed := prometheus.NewCounter(prometheus.CounterOpts{
@@ -131,7 +146,7 @@ func main() {
 			logger.Errorf("loitering: failed to unmarshal WorkflowRun, dead-lettering: %v", err)
 			return models.PipelineError, payload, 0
 		}
-		return handleMessage(logger, q.Client, workflowsQueue, &run), payload, 0
+		return handleMessage(logger, tracer, q.Client, workflowsQueue, &run), payload, 0
 	}
 
 	// ReadRawMessages is a method on the concrete RabbitMQ client (it is not part
