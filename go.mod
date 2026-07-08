@@ -5,8 +5,9 @@ go 1.25.8
 require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.4
-	github.com/uug-ai/models v1.6.3
-	github.com/uug-ai/queue v1.3.8
+	github.com/uug-ai/ingest v0.0.0-20260622135659-13eefb5df1bb
+	github.com/uug-ai/models v1.6.5
+	github.com/uug-ai/queue v1.3.9
 )
 
 require (
@@ -28,5 +29,5 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	google.golang.org/protobuf v1.36.8 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )
