@@ -8,7 +8,7 @@ require (
 	github.com/uug-ai/ingest v0.0.0-20260622135659-13eefb5df1bb
 	github.com/uug-ai/models v1.6.5
 	github.com/uug-ai/queue v1.3.9
-	github.com/uug-ai/trace v1.2.0
+	github.com/uug-ai/trace v1.2.1
 )
 
 require (
