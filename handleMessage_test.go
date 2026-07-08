@@ -9,6 +9,7 @@ import (
 	ingest "github.com/uug-ai/ingest/pkg/ingest"
 	"github.com/uug-ai/models/pkg/models"
 	queue "github.com/uug-ai/queue/pkg/queue"
+	"github.com/uug-ai/trace/pkg/opentelemetry"
 )
 
 // TestHandleMessageRoutesMarker verifies that a dispatched loitering stage is
@@ -47,7 +48,12 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 		},
 	}
 
-	action := handleMessage(logrus.New(), q, "hub-workflows-queue", run)
+	tracer, err := opentelemetry.NewTracer("hub-loitering")
+	if err != nil {
+		t.Fatalf("NewTracer() error: %v", err)
+	}
+
+	action := handleMessage(logrus.New(), tracer, q, "hub-workflows-queue", run)
 	if action != models.PipelineCancel {
 		t.Errorf("action = %q, want %q (result routed explicitly)", action, models.PipelineCancel)
 	}

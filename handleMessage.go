@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/sirupsen/logrus"
@@ -8,6 +9,7 @@ import (
 	ingest "github.com/uug-ai/ingest/pkg/ingest"
 	"github.com/uug-ai/models/pkg/models"
 	queue "github.com/uug-ai/queue/pkg/queue"
+	"github.com/uug-ai/trace/pkg/opentelemetry"
 
 	"github.com/uug-ai/hub-loitering/internal/loitering"
 )
@@ -28,7 +30,7 @@ import (
 //
 // It returns PipelineCancel: the result has already been routed onward via an
 // explicit publish, so there is nothing for the queue library to forward.
-func handleMessage(logger *logrus.Logger, q queue.QueueInterface, workflowsQueue string, run *models.WorkflowRun) models.PipelineAction {
+func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.QueueInterface, workflowsQueue string, run *models.WorkflowRun) models.PipelineAction {
 	logger.WithFields(logrus.Fields{
 		"operation":  run.Operation,
 		"traceId":    run.TraceId,
@@ -37,6 +39,26 @@ func handleMessage(logger *logrus.Logger, q queue.QueueInterface, workflowsQueue
 		"deviceKey":  run.Device.DeviceKey,
 		"hasStorage": loitering.HasCredentials(run.Storage),
 	}).Info("loitering stage received dispatch")
+
+	// Continue the distributed trace the workflows engine propagates on each run
+	// (the trace ID travels on the WorkflowRun) and open a span for this stage's
+	// work, so the loitering measurement shows up under the same trace as the
+	// upstream analysis/engine hops instead of only being logged. Tracing is
+	// best-effort: an invalid/empty trace ID or a missing collector just leaves the
+	// work under a fresh (or no-op) span rather than failing the dispatch.
+	spanCtx, err := tracer.ContinueWithTrace(context.Background(), run.TraceId)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"traceId":  run.TraceId,
+			"mediaKey": run.Key,
+		}).Warnf("loitering: could not continue trace: %v", err)
+	}
+	_, span := tracer.CreateSpan(spanCtx, map[string]string{
+		"operation": run.Operation,
+		"fileName":  run.Key,
+		"deviceKey": run.Device.DeviceKey,
+	})
+	defer span.End()
 
 	// Build the result routed back to the engine. Preserve the run envelope (its
 	// identity and accumulated upstream context) but drop the storage credentials
