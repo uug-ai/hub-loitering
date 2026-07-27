@@ -50,16 +50,23 @@ has labelled a person:
     "queue": "kcloud-loitering-queue.fifo",
     "needs": [
       { "operation": "classify",
-        "condition": { "path": "inputs.classify.properties", "op": "contains", "value": "person" } }
+        "condition": { "path": "inputs.classify.details.*.classified", "op": "eq", "value": "person" } }
     ]
   }
 ]
 ```
 
+Match `inputs.classify.details.*.classified`, not `inputs.classify.properties`:
+the `.details.*.classified` fan-out is the per-object class this worker actually
+reads (a run only reaches loitering when a detected object was classified
+`person`). `inputs.classify.properties` is a separate, frequently-empty summary
+list, so gating on it silently drops many person recordings.
+
 `dispatch` is the closed enum `always` | `conditional` (a stage with `needs`
 must be `conditional`), and a condition `path` is absolute from the run root —
-`inputs.classify.properties`, not a bare `properties`. The engine validates both
-at boot and refuses to start on an invalid registry.
+`inputs.classify.details.*.classified`, not a bare `details`. The `*` fans out
+across the `details` array; the engine validates both `dispatch` and `path` at
+boot and refuses to start on an invalid registry.
 
 ## Configuration
 
