@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	ingest "github.com/uug-ai/ingest/pkg/ingest"
 	"github.com/uug-ai/models/pkg/models"
@@ -19,6 +23,14 @@ import (
 // that the action is terminal (Cancel) since the result was published
 // explicitly.
 func TestHandleMessageRoutesMarker(t *testing.T) {
+	provider := sdktrace.NewTracerProvider()
+	originalProvider := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(originalProvider)
+		_ = provider.Shutdown(context.Background())
+	})
+
 	q, err := queue.NewMockQueue()
 	if err != nil {
 		t.Fatalf("NewMockQueue() error: %v", err)
@@ -28,7 +40,7 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 		Operation: "loitering",
 		RunId:     "run-1",
 		Key:       "1700000000_6_camera1_1920_1080_30.mp4",
-		TraceId:   "trace-123",
+		TraceId:   "0123456789abcdef0123456789abcdef",
 		Storage: &models.WorkflowStorage{
 			Uri:       "s3://bucket",
 			AccessKey: "AKIA",
@@ -53,7 +65,8 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 		t.Fatalf("NewTracer() error: %v", err)
 	}
 
-	action := handleMessage(logrus.New(), tracer, q, "hub-workflows-queue", run)
+	carrier := opentelemetry.TraceContextCarrier{TraceParent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"}
+	action := handleMessage(logrus.New(), tracer, q, "hub-workflows-queue", run, carrier)
 	if action != models.PipelineCancel {
 		t.Errorf("action = %q, want %q (result routed explicitly)", action, models.PipelineCancel)
 	}
@@ -64,8 +77,17 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 	}
 
 	var result models.WorkflowRun
-	if err := json.Unmarshal([]byte(sent[0]), &result); err != nil {
+	resultCarrier, err := opentelemetry.UnmarshalWithTraceContext([]byte(sent[0]), &result)
+	if err != nil {
 		t.Fatalf("unmarshal routed result: %v", err)
+	}
+	continued, err := tracer.ContinueWithTraceContext(context.Background(), result.TraceId, resultCarrier)
+	if err != nil {
+		t.Fatalf("continue routed trace context: %v", err)
+	}
+	resultParent := oteltrace.SpanContextFromContext(continued)
+	if !resultParent.IsValid() || resultParent.TraceID().String() != result.TraceId || resultParent.SpanID().String() == "0123456789abcdef" {
+		t.Fatalf("routed trace context = %v, want loitering child span", resultParent)
 	}
 	if result.Operation != "loitering" {
 		t.Errorf("result.Operation = %q, want \"loitering\"", result.Operation)

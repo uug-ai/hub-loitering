@@ -19,7 +19,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -142,11 +141,12 @@ func main() {
 	// the result back to the engine itself and we ack it (PipelineCancel).
 	rawHandler := func(payload []byte, args ...any) (models.PipelineAction, []byte, int) {
 		var run models.WorkflowRun
-		if err := json.Unmarshal(payload, &run); err != nil {
+		carrier, err := opentelemetry.UnmarshalWithTraceContext(payload, &run)
+		if err != nil {
 			logger.Errorf("loitering: failed to unmarshal WorkflowRun, dead-lettering: %v", err)
 			return models.PipelineError, payload, 0
 		}
-		return handleMessage(logger, tracer, q.Client, workflowsQueue, &run), payload, 0
+		return handleMessage(logger, tracer, q.Client, workflowsQueue, &run, carrier), payload, 0
 	}
 
 	// ReadRawMessages is a method on the concrete RabbitMQ client (it is not part

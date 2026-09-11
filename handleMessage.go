@@ -30,7 +30,7 @@ import (
 //
 // It returns PipelineCancel: the result has already been routed onward via an
 // explicit publish, so there is nothing for the queue library to forward.
-func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.QueueInterface, workflowsQueue string, run *models.WorkflowRun) models.PipelineAction {
+func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.QueueInterface, workflowsQueue string, run *models.WorkflowRun, carrier opentelemetry.TraceContextCarrier) models.PipelineAction {
 	logger.WithFields(logrus.Fields{
 		"operation":  run.Operation,
 		"traceId":    run.TraceId,
@@ -40,20 +40,16 @@ func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.
 		"hasStorage": loitering.HasCredentials(run.Storage),
 	}).Info("loitering stage received dispatch")
 
-	// Continue the distributed trace the workflows engine propagates on each run
-	// (the trace ID travels on the WorkflowRun) and open a span for this stage's
-	// work, so the loitering measurement shows up under the same trace as the
-	// upstream analysis/engine hops instead of only being logged. Tracing is
-	// best-effort: an invalid/empty trace ID or a missing collector just leaves the
-	// work under a fresh (or no-op) span rather than failing the dispatch.
-	spanCtx, err := tracer.ContinueWithTrace(context.Background(), run.TraceId)
+	// Continue from the engine's W3C parent context and open the stage span. Older
+	// dispatches carry only TraceId and use the compatible root-like fallback.
+	spanCtx, err := tracer.ContinueWithTraceContext(context.Background(), run.TraceId, carrier)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
 			"traceId":  run.TraceId,
 			"mediaKey": run.Key,
 		}).Warnf("loitering: could not continue trace: %v", err)
 	}
-	_, span := tracer.CreateSpan(spanCtx, map[string]string{
+	stageCtx, span := tracer.CreateSpan(spanCtx, map[string]string{
 		"operation": run.Operation,
 		"fileName":  run.Key,
 		"deviceKey": run.Device.DeviceKey,
@@ -96,7 +92,7 @@ func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.
 	}
 	result.Payload = envelope
 
-	payload, err := json.Marshal(&result)
+	payload, err := opentelemetry.MarshalWithTraceContext(&result, tracer.InjectTraceContext(stageCtx))
 	if err != nil {
 		logger.Errorf("loitering: failed to marshal result for media=%s: %v", run.Key, err)
 		return models.PipelineCancel
