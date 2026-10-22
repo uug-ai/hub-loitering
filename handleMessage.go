@@ -41,19 +41,24 @@ func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.
 	}).Info("loitering stage received dispatch")
 
 	// Continue the distributed trace the workflows engine propagates on each run
-	// (the trace ID travels on the WorkflowRun) and open a span for this stage's
-	// work, so the loitering measurement shows up under the same trace as the
-	// upstream analysis/engine hops instead of only being logged. Tracing is
-	// best-effort: an invalid/empty trace ID or a missing collector just leaves the
-	// work under a fresh (or no-op) span rather than failing the dispatch.
-	spanCtx, err := tracer.ContinueWithTrace(context.Background(), run.TraceId)
+	// (the trace ID plus the dispatching hop's W3C traceparent/tracestate travel
+	// on the WorkflowRun) and open a span for this stage's work, so the loitering
+	// measurement shows up as a child of the engine's dispatch span and follows
+	// its sampling decision instead of only being logged. Tracing is best-effort:
+	// an invalid/empty trace ID, a malformed traceparent or a missing collector
+	// just leaves the work under a fresh (or no-op) span rather than failing the
+	// dispatch.
+	spanCtx, err := tracer.ContinueWithTraceContext(context.Background(), run.TraceId, opentelemetry.TraceContextCarrier{
+		TraceParent: run.TraceParent,
+		TraceState:  run.TraceState,
+	})
 	if err != nil {
 		logger.WithFields(logrus.Fields{
 			"traceId":  run.TraceId,
 			"mediaKey": run.Key,
 		}).Warnf("loitering: could not continue trace: %v", err)
 	}
-	_, span := tracer.CreateSpan(spanCtx, map[string]string{
+	stageCtx, span := tracer.CreateSpan(spanCtx, map[string]string{
 		"operation": run.Operation,
 		"fileName":  run.Key,
 		"deviceKey": run.Device.DeviceKey,
@@ -95,6 +100,13 @@ func handleMessage(logger *logrus.Logger, tracer *opentelemetry.Tracer, q queue.
 		return models.PipelineCancel
 	}
 	result.Payload = envelope
+
+	// Hand the engine this stage's span as the next hop's parent. The result is
+	// copied from the inbound run, so overwrite (never keep) the engine's
+	// dispatch traceparent.
+	traceContext := tracer.InjectTraceContext(stageCtx)
+	result.TraceParent = traceContext.TraceParent
+	result.TraceState = traceContext.TraceState
 
 	payload, err := json.Marshal(&result)
 	if err != nil {

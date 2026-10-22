@@ -24,29 +24,7 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 		t.Fatalf("NewMockQueue() error: %v", err)
 	}
 
-	run := &models.WorkflowRun{
-		Operation: "loitering",
-		RunId:     "run-1",
-		Key:       "1700000000_6_camera1_1920_1080_30.mp4",
-		TraceId:   "trace-123",
-		Storage: &models.WorkflowStorage{
-			Uri:       "s3://bucket",
-			AccessKey: "AKIA",
-			Secret:    "secret",
-		},
-		Inputs: map[string]interface{}{
-			"classify": map[string]any{
-				"properties": []any{"person"},
-				"details": []any{
-					map[string]any{
-						"id":         "p-1",
-						"classified": "person",
-						"frames":     []any{float64(0), float64(180)},
-					},
-				},
-			},
-		},
-	}
+	run := dispatchRun()
 
 	tracer, err := opentelemetry.NewTracer("hub-loitering")
 	if err != nil {
@@ -97,5 +75,33 @@ func TestHandleMessageRoutesMarker(t *testing.T) {
 	}
 	if marker.Duration != 30 {
 		t.Errorf("marker.Duration = %d, want 30s for the 180-frame person dwell", marker.Duration)
+	}
+}
+
+// dispatchRun is a loitering stage dispatch whose classify trajectory holds a
+// 180-frame person dwell.
+func dispatchRun() *models.WorkflowRun {
+	return &models.WorkflowRun{
+		Operation: "loitering",
+		RunId:     "run-1",
+		Key:       "1700000000_6_camera1_1920_1080_30.mp4",
+		TraceId:   "trace-123",
+		Storage: &models.WorkflowStorage{
+			Uri:       "s3://bucket",
+			AccessKey: "AKIA",
+			Secret:    "secret",
+		},
+		Inputs: map[string]interface{}{
+			"classify": map[string]any{
+				"properties": []any{"person"},
+				"details": []any{
+					map[string]any{
+						"id":         "p-1",
+						"classified": "person",
+						"frames":     []any{float64(0), float64(180)},
+					},
+				},
+			},
+		},
 	}
 }
