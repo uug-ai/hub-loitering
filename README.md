@@ -23,6 +23,9 @@ collection and shows it on the recording's timeline.
 
 ## How it fits the workflow
 
+Build and test with Go 1.26.10 or later. Production images use Go 1.26.10
+and Alpine 3.24.3.
+
 ```
 classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶ hub-loitering
                                                                           │
