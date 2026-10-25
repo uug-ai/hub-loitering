@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/devcontainers/go:1.25-bookworm AS builder
+FROM golang:1.26.10-bookworm AS builder
+
+ENV GOTOOLCHAIN=local
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
@@ -42,7 +44,7 @@ RUN cp -r /${project} ./
 # Copy or create other directories/files your app needs during runtime.
 RUN mkdir /data
 
-FROM alpine:latest
+FROM alpine:3.24.3
 LABEL org.opencontainers.image.source https://github.com/uug-ai/hub-loitering
 LABEL AUTHOR=uug-ai
 
