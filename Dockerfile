@@ -63,7 +63,8 @@ COPY --chown=0:0 --from=builder /dist /
 ############################
 # Move directory to /var/lib
 
-RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
+# Require the CVE-2026-92392 fixes in both the curl tool and library.
+RUN apk update && apk add ca-certificates 'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
 
 
 ####################
