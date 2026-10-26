@@ -12,31 +12,45 @@ on:
           - major
           - minor
           - patch
+      existing_tag:
+        description: Existing release to retry (empty creates the next version)
+        type: string
+        default: ""
+      publish:
+        description: Publish after verification (false validates without creating a version)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
-  # Determine the next version, create the GitHub release and expose the tag.
+  # Keep the release draft until all native image gates pass.
   bump-release:
+    if: inputs.publish && inputs.existing_tag == ''
     uses: uug-ai/workflows/.github/workflows/release-bump.yml@main
     with:
       bump: ${{ github.event.inputs.bump }}
+      draft: true
     secrets: inherit
 
-  # Run the original release pipeline for the freshly created tag.
-  # A release created with the default GITHUB_TOKEN does not emit the
-  # `release: created` event, so we invoke the reusable workflow directly.
   release:
     needs: bump-release
+    if: ${{ always() && !cancelled() && (needs.bump-release.result == 'success' || needs.bump-release.result == 'skipped') }}
     uses: uug-ai/workflows/.github/workflows/release-create.yml@main
     with:
       organization: uug-ai
       project: ${{ github.event.repository.name }}
-      tag: ${{ needs.bump-release.outputs.tag }}
+      tag: ${{ inputs.existing_tag || needs.bump-release.outputs.tag }}
       docker_context: "."
-      create_gitops_pr: true
+      hardened: true
+      publish: ${{ inputs.publish }}
+      finalize_release: true
+      use_private_module_auth: false
+      smoke_queue: kcloud-loitering-queue.fifo
+      create_gitops_pr: ${{ inputs.publish }}
       runner_matrix: >-
         [
           {"architecture":"amd64","runner":"ubuntu-24.04"},

@@ -23,8 +23,8 @@ collection and shows it on the recording's timeline.
 
 ## How it fits the workflow
 
-Build and test with Go 1.26.10 or later. Production images use Go 1.26.10
-and Alpine 3.24.3.
+Build and test with Go 1.26.10 or later. Production images use digest-pinned
+Go 1.26.10 and Chainguard glibc-dynamic bases.
 
 ```
 classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶ hub-loitering
@@ -38,6 +38,83 @@ classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶
 
 The worker is **DB-free**: all persistence is delegated to the workflows engine
 via the `loitering` result published on the workflows queue.
+
+## Production image contract
+
+Images are published as `ghcr.io/uug-ai/hub-loitering:<version>` for Linux
+amd64 and arm64. Deploy the immutable manifest digest from the verified release,
+not `latest`. The runtime base uses Chainguard's public `latest` channel pinned
+to a verified multi-platform digest; that digest, not the channel, determines
+the base contents. Refresh both base pins regularly.
+
+* Entrypoint: `/app/main`, working directory `/app`, UID/GID `65532:65532`.
+  The executable is root-owned and mode `0555`; the runtime user cannot replace it.
+* No shell, curl, package manager, model weights, media assets or writable
+  application directories are required. The existing trajectory/dwell logic
+  reads only the workflow invocation and returns the same marker result.
+* The minimal glibc runtime supports the shared queue library's CGO dependency.
+  CA certificates come from the runtime base; timezone data is embedded with
+  `timetzdata`. Go builds retain symbol tables (`-w -buildid=`, **not** `-s`)
+  for binary vulnerability reachability checks.
+* Configure `RABBITMQ_HOST`, `RABBITMQ_EXCHANGE`, `RABBITMQ_USERNAME` and
+  `RABBITMQ_PASSWORD` through deployment secrets/configuration.
+  `LOITERING_QUEUE` defaults to `kcloud-loitering-queue.fifo`;
+  `WORKFLOWS_QUEUE` defaults to `hub-workflows-queue`. Optional `LOG_LEVEL` and
+  `OTEL_EXPORTER_OTLP_ENDPOINT` retain their existing behavior.
+* Outbound access is needed to RabbitMQ and, when configured, the OTLP endpoint
+  (plus DNS). No MongoDB, storage downloads or inference service is required.
+* Prometheus metrics use HTTP `GET /metrics` on port **8080**, expected status
+  **200**, with a recommended probe timeout of **2 seconds**. This is process
+  liveness, **not** queue readiness. CI also requires one consumer on the stage
+  queue. There is no shell-based image healthcheck.
+* Helm/deployment integration must use numeric `runAsUser: 65532`,
+  `runAsGroup: 65532`, `runAsNonRoot: true`, `readOnlyRootFilesystem: true`,
+  `allowPrivilegeEscalation: false`, dropped `ALL` capabilities and
+  `seccompProfile.type: RuntimeDefault`. No writable volume or tmpfs is needed.
+  Replace any old `/home/hub-loitering/main` command override or exec/curl probe
+  with the image entrypoint or an HTTP metrics probe. Chart changes belong in
+  the deployment repository, not this service.
+
+The `.dockerignore` allowlist sends only Go sources and module manifests to the
+builder. Public Go checksum verification stays enabled; `GOPRIVATE` scopes only
+`github.com/uug-ai/*`. If a private dependency is introduced, use
+`docker buildx build --secret id=github_token,env=GITHUB_TOKEN .` with a scoped,
+read-only token; never use credential build arguments. Current CI builds without
+private-module credentials.
+
+### Verification and release
+
+The **Security scan** workflow calls the existing shared hardened **worker**
+profile on native amd64 and arm64 runners. It runs the Dockerfile `test` target
+(vet, unit tests, race tests, pinned govulncheck source and binary checks), scans
+source/configuration/secrets, inspects the runtime filesystem, and starts the
+actual image against an isolated CI RabbitMQ broker with a read-only root,
+all capabilities dropped and no privilege escalation. It checks both metrics
+and the default stage queue consumer; no production credentials or traffic are
+used. Workflow invocation/result, tracing, credential stripping, and trajectory
+behavior are covered by the existing Go tests, not by the startup smoke alone.
+
+Final image scans block medium/high/critical vulnerabilities and secrets;
+the shared pipeline retains JSON reports, rootfs inventory, smoke logs and
+`image.spdx.json` in per-architecture `hardened-image-*` artifacts. These gates
+must pass on both architectures before calling the image verified.
+
+**Bump release** is the sole release entrypoint. It reserves a draft tag, runs
+the same native gates, publishes provenance/SBOM and immutable image digests,
+signs the multi-platform image and only then finalizes the release and requests
+the existing GitOps update at `kerberoshub.services.loitering.tag`.
+`publish: false` validates without creating a version; `existing_tag` retries
+an existing draft. No release-created workflow bypasses those gates.
+This requires the existing `uug-ai/workflows` hardened worker and draft-release
+interfaces on `main`; no new shared profile is required.
+
+Download the SBOM and scan evidence from the release workflow artifacts. Verify
+the published digest with Cosign, binding the certificate identity to the
+successful `uug-ai/workflows/.github/workflows/release-create.yml@refs/heads/main`
+workflow and issuer `https://token.actions.githubusercontent.com`; see the
+[image-hardening guide](https://learn.uug.ai/guides/security/image-hardening/)
+for the platform policy. Do not infer complete deployment CIS compliance from
+image construction alone.
 
 ## Register it as a stage
 
