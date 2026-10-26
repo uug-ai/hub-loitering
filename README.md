@@ -105,12 +105,17 @@ signs the multi-platform image and only then finalizes the release and requests
 the existing GitOps update at `kerberoshub.services.loitering.tag`.
 `publish: false` validates without creating a version; `existing_tag` retries
 an existing draft. No release-created workflow bypasses those gates.
-This requires the existing `uug-ai/workflows` hardened worker and draft-release
-interfaces on `main`; no new shared profile is required.
+This rollout consumes the `uug-ai/workflows@security/image-hardening-rollout`
+hardened worker and draft-release interfaces (coordinated integration commit
+`06b9196581db4720d6be8f53dc697cbdbab528ba`); no new shared profile is required.
+The worker smoke explicitly selects `QUEUE_SYSTEM=RABBITMQ`.
+Keep the caller ref and signer identity synchronized when promoting the shared
+workflow changes.
 
 Download the SBOM and scan evidence from the release workflow artifacts. Verify
 the published digest with Cosign, binding the certificate identity to the
-successful `uug-ai/workflows/.github/workflows/release-create.yml@refs/heads/main`
+successful
+`uug-ai/workflows/.github/workflows/release-create.yml@refs/heads/security/image-hardening-rollout`
 workflow and issuer `https://token.actions.githubusercontent.com`; see the
 [image-hardening guide](https://learn.uug.ai/guides/security/image-hardening/)
 for the platform policy. Do not infer complete deployment CIS compliance from

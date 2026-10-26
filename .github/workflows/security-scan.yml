@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   hardened-image:
-    uses: uug-ai/workflows/.github/workflows/release-create.yml@main
+    uses: uug-ai/workflows/.github/workflows/release-create.yml@security/image-hardening-rollout
     with:
       hardened: true
       publish: false
