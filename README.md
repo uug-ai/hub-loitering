@@ -24,7 +24,7 @@ collection and shows it on the recording's timeline.
 ## How it fits the workflow
 
 Build and test with Go 1.26.10 or later. Production images use digest-pinned
-Go 1.26.10 and Chainguard glibc-dynamic bases.
+Go 1.26.10 and Wolfi build bases, with a package-managed dynamic Kafka runtime.
 
 ```
 classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶ hub-loitering
@@ -43,19 +43,27 @@ via the `loitering` result published on the workflows queue.
 
 Images are published as `ghcr.io/uug-ai/hub-loitering:<version>` for Linux
 amd64 and arm64. Deploy the immutable manifest digest from the verified release,
-not `latest`. The runtime base uses Chainguard's public `latest` channel pinned
-to a verified multi-platform digest; that digest, not the channel, determines
-the base contents. Refresh both base pins regularly.
+not `latest`. The Wolfi build base uses Chainguard's public `latest` channel
+pinned to a verified multi-platform digest. The final scratch image contains
+only the genuine APK-installed runtime tree and the application, not the
+builder's compiler or package-manager executables. Refresh both base pins and
+runtime packages regularly.
 
 * Entrypoint: `/app/main`, working directory `/app`, UID/GID `65532:65532`.
   The executable is root-owned and mode `0555`; the runtime user cannot replace it.
 * No shell, curl, package manager, model weights, media assets or writable
   application directories are required. The existing trajectory/dwell logic
   reads only the workflow invocation and returns the same marker result.
-* The minimal glibc runtime supports the shared queue library's CGO dependency.
-  CA certificates come from the runtime base; timezone data is embedded with
-  `timetzdata`. Go builds retain symbol tables (`-w -buildid=`, **not** `-s`)
-  for binary vulnerability reachability checks.
+* The shared queue library's Kafka implementation is retained, dynamically
+  linked with `-tags dynamic,timetzdata,netgo` against APK
+  `librdkafka=2.16.0-r0`. Its OpenSSL, SASL, compression, HTTP/OIDC and glibc
+  dependencies come from real signed APK packages; `/lib/apk/db/installed`
+  retains their actual metadata and file ownership. This avoids hiding native
+  Kafka components inside the Go wrapper's bundled static archive.
+* `ca-certificates-bundle` supplies the CA bundle. The complete package tree
+  is copied without blanket `--chmod`, preserving searchable `/etc` parents.
+  Timezone data is embedded with `timetzdata`. Go builds retain symbol tables
+  (`-w -buildid=`, **not** `-s`) for binary vulnerability reachability checks.
 * Configure `RABBITMQ_HOST`, `RABBITMQ_EXCHANGE`, `RABBITMQ_USERNAME` and
   `RABBITMQ_PASSWORD` through deployment secrets/configuration.
   `LOITERING_QUEUE` defaults to `kcloud-loitering-queue.fifo`;
@@ -94,6 +102,24 @@ and the default stage queue consumer; no production credentials or traffic are
 used. Workflow invocation/result, tracing, credential stripping, and trajectory
 behavior are covered by the existing Go tests, not by the startup smoke alone.
 
+`TestDynamicKafkaNativeRuntime` checks dynamic librdkafka 2.16.0, required
+gzip/snappy/SSL/SASL/LZ4/SCRAM/OAUTHBEARER/Zstd/HTTP/OIDC feature availability,
+CA parsing, and a bounded producer/consumer roundtrip through librdkafka's
+in-process mock broker. It runs both in the runtime package root and in the
+**actual final image**, with UID/GID 65532, read-only root, no capabilities,
+no external network, and readable `/etc/resolv.conf`. The verifier is mounted
+read-only for the test; it is not shipped in the production image. No production
+authentication settings are changed. This does **not** establish external
+SASL/TLS interoperability: those still require deployment-specific tests
+against the real configured broker and identity provider.
+
+The additional smoke extracts the real APK database, inventories all native
+ELF dependencies/interpreter and package-owned `.so` files, and retains the
+ownership joins under `runtime-evidence`. The `native-inventory` CI job requires
+exact name/version closure between every installed APK, the scanner OS
+inventory and the SPDX package inventory, on **both** architectures.
+It retains comparison tables and counts in `native-inventory-closure`.
+
 Final image scans block medium/high/critical vulnerabilities and secrets;
 the shared pipeline retains JSON reports, rootfs inventory, smoke logs and
 `image.spdx.json` in per-architecture `hardened-image-*` artifacts. These gates
@@ -105,9 +131,9 @@ signs the multi-platform image and only then finalizes the release and requests
 the existing GitOps update at `kerberoshub.services.loitering.tag`.
 `publish: false` validates without creating a version; `existing_tag` retries
 an existing draft. No release-created workflow bypasses those gates.
-This rollout consumes the `uug-ai/workflows@security/image-hardening-rollout`
-hardened worker and draft-release interfaces (coordinated integration commit
-`06b9196581db4720d6be8f53dc697cbdbab528ba`); no new shared profile is required.
+This rollout consumes the immutable `uug-ai/workflows` hardened worker and
+draft-release interfaces at `f987049597f729e1ca3ca801f6fdedc2b1b06917`;
+no new shared profile is required.
 The worker smoke explicitly selects `QUEUE_SYSTEM=RABBITMQ`.
 Keep the caller ref and signer identity synchronized when promoting the shared
 workflow changes.
@@ -115,7 +141,7 @@ workflow changes.
 Download the SBOM and scan evidence from the release workflow artifacts. Verify
 the published digest with Cosign, binding the certificate identity to the
 successful
-`uug-ai/workflows/.github/workflows/release-create.yml@refs/heads/security/image-hardening-rollout`
+`uug-ai/workflows/.github/workflows/release-create.yml@f987049597f729e1ca3ca801f6fdedc2b1b06917`
 workflow and issuer `https://token.actions.githubusercontent.com`; see the
 [image-hardening guide](https://learn.uug.ai/guides/security/image-hardening/)
 for the platform policy. Do not infer complete deployment CIS compliance from
