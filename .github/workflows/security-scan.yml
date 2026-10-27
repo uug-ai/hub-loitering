@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   hardened-image:
-    uses: uug-ai/workflows/.github/workflows/release-create.yml@f987049597f729e1ca3ca801f6fdedc2b1b06917
+    uses: uug-ai/workflows/.github/workflows/release-create.yml@787d9128bd488896a61e390c84a3d47794e6817f
     with:
       hardened: true
       publish: false

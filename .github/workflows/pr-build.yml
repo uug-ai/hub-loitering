@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    uses: uug-ai/workflows/.github/workflows/pr-build.yml@f987049597f729e1ca3ca801f6fdedc2b1b06917
+    uses: uug-ai/workflows/.github/workflows/pr-build.yml@787d9128bd488896a61e390c84a3d47794e6817f
     with:
       project: ${{ github.event.repository.name }}
       go_version: "1.26.10"
