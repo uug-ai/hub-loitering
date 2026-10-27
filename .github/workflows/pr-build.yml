@@ -14,5 +14,5 @@ jobs:
       docker_context: "."
       use_private_module_auth: false
       use_buildkit_secrets: true
-      runner_matrix: '[{"architecture":"amd64","runner":"ubuntu-24.04"},{"architecture":"arm64","runner":"ubuntu-24.04-arm"}]'
+      runner_matrix: '[{"architecture":"amd64","runner":"ubuntu-22.04"},{"architecture":"arm64","runner":"ubuntu-22.04-arm"}]'
     secrets: inherit

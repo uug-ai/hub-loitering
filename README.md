@@ -226,3 +226,9 @@ main.go                       Command wiring: logger, env, queue, metrics, read 
 handleMessage.go              Transport glue: dispatch -> internal/loitering -> route result
 internal/loitering/           Stage behaviour (Process, HasCredentials, Operation)
 ```
+Native MongoDB CI and release validation temporarily use supported Ubuntu 22.04
+AMD64/ARM64 hosts after MongoDB 8 rejected newer runner kernels with fatal
+12257600. This does not change the runtime image, MongoDB version or safety
+guard. Return to newer runners when a verified official MongoDB image includes
+the [upstream fix](https://jira.mongodb.org/browse/SERVER-131779), before
+[Ubuntu 22 runner retirement](https://github.com/actions/runner-images/issues/14254).
