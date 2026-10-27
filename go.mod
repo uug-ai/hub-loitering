@@ -3,6 +3,7 @@ module github.com/uug-ai/hub-loitering
 go 1.26.10
 
 require (
+	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/uug-ai/ingest v1.0.17
@@ -33,7 +34,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

@@ -5,12 +5,14 @@ on:
 
 jobs:
   build:
-    uses: uug-ai/workflows/.github/workflows/pr-build.yml@main
+    uses: uug-ai/workflows/.github/workflows/pr-build.yml@ff61364bb99093f43f0c02b2f5091f0e22ba9fb6
     with:
       project: ${{ github.event.repository.name }}
       go_version: "1.26.10"
       go_dir: "."
       go_sum_path: "go.sum"
       docker_context: "."
+      use_private_module_auth: false
+      use_buildkit_secrets: true
       runner_matrix: '[{"architecture":"amd64","runner":"ubuntu-24.04"},{"architecture":"arm64","runner":"ubuntu-24.04-arm"}]'
     secrets: inherit
