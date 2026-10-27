@@ -54,8 +54,8 @@ jobs:
       create_gitops_pr: ${{ inputs.publish }}
       runner_matrix: >-
         [
-          {"architecture":"amd64","runner":"ubuntu-24.04"},
-          {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
+          {"architecture":"amd64","runner":"ubuntu-22.04"},
+          {"architecture":"arm64","runner":"ubuntu-22.04-arm"}
         ]
       gitops_key: kerberoshub.services.loitering.tag
     secrets: inherit
