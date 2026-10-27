@@ -41,14 +41,6 @@ awk '
   /^R:/ { print "/" directory "/" substr($0, 3) "\t" package "\t" version }
 ' "$evidence/apk-installed" > "$evidence/apk-file-owners.tsv"
 
-awk '
-  FNR == NR { owner[$1] = $0; next }
-  !($0 in owner) { print "No installed APK owns " $0 > "/dev/stderr"; missing = 1; next }
-  { print owner[$0] }
-  END { exit missing }
-' "$evidence/apk-file-owners.tsv" "$evidence/native-files.txt" \
-  > "$evidence/native-file-owners.tsv"
-
 awk '/NEEDED/ {
   sub(/^.*\[/, "")
   sub(/\].*$/, "")
@@ -62,17 +54,7 @@ awk '/Requesting program interpreter:/ {
 }' "$evidence/program-headers.txt" >> "$evidence/native-needed.txt"
 sort -u -o "$evidence/native-needed.txt" "$evidence/native-needed.txt"
 
-awk '
-  FNR == NR {
-    count = split($1, path, "/")
-    owner[path[count]] = $0
-    next
-  }
-  !($0 in owner) { print "No installed APK owns required library " $0 > "/dev/stderr"; missing = 1; next }
-  { print owner[$0] }
-  END { exit missing }
-' "$evidence/apk-file-owners.tsv" "$evidence/native-needed.txt" \
-  | tee "$evidence/native-dependency-owners.tsv"
+bash image/verify-native-owners.sh "$evidence"
 
 build_args=(--target test --load --tag "$test_image" --file "${DOCKERFILE:-Dockerfile}")
 if [ -n "${GH_TOKEN:-}" ]; then
