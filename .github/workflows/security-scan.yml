@@ -12,8 +12,10 @@ permissions:
 
 jobs:
   hardened-image:
-    uses: uug-ai/workflows/.github/workflows/release-create.yml@ff61364bb99093f43f0c02b2f5091f0e22ba9fb6
+    uses: uug-ai/workflows/.github/workflows/release-create.yml@2f0e9c2719522b008f3fdd53d8bfb6019a3b1e04
     with:
+      # MongoDB 8 cannot start on Linux 6.19+ runner kernels (SERVER-121912).
+      smoke_mongodb_image: mongo:7
       hardened: true
       publish: false
       use_private_module_auth: false
