@@ -41,6 +41,8 @@ jobs:
     if: ${{ always() && !cancelled() && (needs.bump-release.result == 'success' || needs.bump-release.result == 'skipped') }}
     uses: uug-ai/workflows/.github/workflows/release-create.yml@2f0e9c2719522b008f3fdd53d8bfb6019a3b1e04
     with:
+      # MongoDB 8 cannot start on Linux 6.19+ runner kernels (SERVER-121912).
+      smoke_mongodb_image: mongo:7
       organization: uug-ai
       project: ${{ github.event.repository.name }}
       tag: ${{ inputs.existing_tag || needs.bump-release.outputs.tag }}
