@@ -23,8 +23,8 @@ collection and shows it on the recording's timeline.
 
 ## How it fits the workflow
 
-Build and test with Go 1.26.10 or later. Production images use digest-pinned
-Go 1.26.10 and Wolfi build bases, with a package-managed dynamic Kafka runtime.
+Build and test with Go 1.26.11 or later. Production images use digest-pinned
+Go 1.26.11 and Wolfi build bases, with a package-managed dynamic Kafka runtime.
 
 ```
 classify stage ─▶ (engine) ─dispatch▶ kcloud-loitering-queue.fifo ─▶ hub-loitering
@@ -132,7 +132,7 @@ the existing GitOps update at `kerberoshub.services.loitering.tag`.
 `publish: false` validates without creating a version; `existing_tag` retries
 an existing draft. No release-created workflow bypasses those gates.
 This rollout consumes the immutable `uug-ai/workflows` hardened worker and
-draft-release interfaces at `ff61364bb99093f43f0c02b2f5091f0e22ba9fb6`;
+draft-release interfaces at `2f0e9c2719522b008f3fdd53d8bfb6019a3b1e04`;
 no new shared profile is required.
 The worker smoke explicitly selects `QUEUE_SYSTEM=RABBITMQ`.
 Keep the caller ref and signer identity synchronized when promoting the shared
@@ -141,7 +141,7 @@ workflow changes.
 Download the SBOM and scan evidence from the release workflow artifacts. Verify
 the published digest with Cosign, binding the certificate identity to the
 successful
-`uug-ai/workflows/.github/workflows/release-create.yml@ff61364bb99093f43f0c02b2f5091f0e22ba9fb6`
+`uug-ai/workflows/.github/workflows/release-create.yml@2f0e9c2719522b008f3fdd53d8bfb6019a3b1e04`
 workflow and issuer `https://token.actions.githubusercontent.com`; see the
 [image-hardening guide](https://learn.uug.ai/guides/security/image-hardening/)
 for the platform policy. Do not infer complete deployment CIS compliance from
